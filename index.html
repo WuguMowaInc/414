@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>人机验证 · 滑动验证</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #eef2f7;
+            font-family: 'Segoe UI', 'PingFang SC', Roboto, sans-serif;
+            user-select: none;
+            padding: 20px;
+        }
+        .captcha-box {
+            background: #fff;
+            padding: 28px 26px 24px;
+            border-radius: 22px;
+            box-shadow: 0 16px 48px rgba(0, 20, 40, 0.16);
+            max-width: 420px;
+            width: 100%;
+            transition: box-shadow 0.25s;
+        }
+        .captcha-box:hover {
+            box-shadow: 0 20px 56px rgba(0, 20, 40, 0.20);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .header .shield {
+            width: 30px;
+            height: 30px;
+            background: #eef3f9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .header .shield svg {
+            width: 18px;
+            height: 18px;
+            fill: #3b82f6;
+        }
+        .header h3 {
+            font-weight: 600;
+            font-size: 17px;
+            color: #1e293b;
+            letter-spacing: 0.2px;
+        }
+        .header .tag {
+            margin-left: auto;
+            font-size: 12px;
+            background: #eef3f9;
+            color: #475569;
+            padding: 3px 14px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        .header .attempts {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-left: 8px;
+            font-weight: 450;
+        }
+        .canvas-wrap {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #f1f5f9;
+            touch-action: none;
+        }
+        #captchaCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 340 / 200;
+            background: #f8fafc;
+            touch-action: none;
+        }
+        .puzzle-piece {
+            position: absolute;
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.08);
+            pointer-events: none;
+            border: 2px solid rgba(255, 255, 255, 0.30);
+            background-clip: padding-box;
+            will-change: transform, left, top;
+            backface-visibility: hidden;
+        }
+        .puzzle-piece.dragging {
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.10);
+        }
+        .puzzle-piece.ok {
+            border-color: rgba(34, 197, 94, 0.60);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22), 0 4px 16px rgba(34, 197, 94, 0.25);
+        }
+        .puzzle-piece.err {
+            border-color: rgba(239, 68, 68, 0.55);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(239, 68, 68, 0.22);
+            animation: shake 0.42s ease;
+        }
+        @keyframes shake {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+            20% {
+                transform: translateX(-7px);
+            }
+            40% {
+                transform: translateX(7px);
+            }
+            60% {
+                transform: translateX(-5px);
+            }
+            80% {
+                transform: translateX(5px);
+            }
+        }
+        .track-wrap {
+            margin-top: 16px;
+            background: #f1f5f9;
+            border-radius: 40px;
+            padding: 4px 6px;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+            touch-action: none;
+        }
+        .track {
+            position: relative;
+            height: 44px;
+            border-radius: 40px;
+            background: #e9edf3;
+            cursor: pointer;
+            touch-action: none;
+            overflow: visible;
+        }
+        .track .fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            border-radius: 40px;
+            background: linear-gradient(90deg, #b7d0f0, #7aa3e6);
+            width: 0%;
+            pointer-events: none;
+            transition: width 0.04s linear;
+            opacity: 0.35;
+        }
+        .track .fill.ok {
+            background: linear-gradient(90deg, #7ddb9a, #34c759);
+            opacity: 0.55;
+        }
+        .track .fill.err {
+            background: linear-gradient(90deg, #fba1a1, #ef4444);
+            opacity: 0.45;
+        }
+        .thumb {
+            position: absolute;
+            left: 0px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.06);
+            cursor: grab;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: box-shadow 0.2s, transform 0.12s;
+            z-index: 10;
+            will-change: transform, left;
+            border: 2px solid rgba(255, 255, 255, 0.75);
+        }
+        .thumb:active {
+            cursor: grabbing;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.20), 0 2px 8px rgba(0, 0, 0, 0.08);
+            transform: translateY(-50%) scale(0.95);
+        }
+        .thumb .icon {
+            width: 22px;
+            height: 22px;
+            fill: #3b82f6;
+            transition: fill 0.25s;
+        }
+        .thumb.ok .icon {
+            fill: #22c55e;
+        }
+        .thumb.err .icon {
+            fill: #ef4444;
+        }
+        .thumb.disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+        .hint-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding: 0 4px;
+            flex-wrap: wrap;
+            gap: 6px 0;
+        }
+        .hint-row .msg {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 440;
+            transition: color 0.25s;
+            flex: 1;
+        }
+        .hint-row .msg.ok {
+            color: #22c55e;
+            font-weight: 500;
+        }
+        .hint-row .msg.err {
+            color: #ef4444;
+            font-weight: 500;
+        }
+        .hint-row .msg.locked {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .hint-row .actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hint-row .btn-reset {
+            background: none;
+            border: none;
+            font-size: 13px;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 20px;
+            transition: all 0.2s;
+            font-weight: 450;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .hint-row .btn-reset:hover {
+            color: #1e293b;
+            background: #f1f5f9;
+        }
+        .hint-row .btn-reset:active {
+            transform: scale(0.94);
+        }
+        .hint-row .btn-reset svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+        .hint-row .direct-link {
+            font-size: 13px;
+            color: #3b82f6;
+            text-decoration: underline;
+            padding: 4px 8px;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+        .hint-row .direct-link:hover {
+            background: #eff6ff;
+        }
+        .badge-result {
+            display: none;
+            margin-top: 14px;
+            padding: 11px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 540;
+            text-align: center;
+            animation: fadeUp 0.32s ease;
+        }
+        .badge-result.show {
+            display: block;
+        }
+        .badge-result.ok {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .badge-result.err {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .badge-result.locked {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        @keyframes fadeUp {
+            0% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @media (max-width: 460px) {
+            .captcha-box {
+                padding: 18px 14px 18px;
+                border-radius: 18px;
+            }
+            .header h3 {
+                font-size: 15px;
+            }
+            .thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .track {
+                height: 40px;
+            }
+            .thumb .icon {
+                width: 20px;
+                height: 20px;
+            }
+            .hint-row .msg {
+                font-size: 13px;
+            }
+        }
+        @media (max-width: 360px) {
+            .captcha-box {
+                padding: 12px 8px 14px;
+            }
+            .thumb {
+                width: 36px;
+                height: 36px;
+            }
+            .track {
+                height: 36px;
+            }
+            .thumb .icon {
+                width: 17px;
+                height: 17px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="captcha-box" id="app">
+        <div class="header">
+            <span class="shield">
+                <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+            </span>
+            <h3>安全验证</h3>
+            <span class="tag">滑动</span>
+            <span class="attempts" id="attemptDisplay">剩余 3 次</span>
+        </div>
+
+        <div class="canvas-wrap" id="canvasWrap">
+            <canvas id="captchaCanvas" width="340" height="200"></canvas>
+            <div class="puzzle-piece" id="puzzlePiece" style="display:none;"></div>
+        </div>
+
+        <div class="track-wrap">
+            <div class="track" id="track">
+                <div class="fill" id="trackFill"></div>
+                <div class="thumb" id="thumb" role="slider" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="hint-row">
+            <span class="msg" id="hintMsg">拖动滑块，将拼图对齐缺口</span>
+            <div class="actions">
+                <button class="btn-reset" id="resetBtn">
+                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                    重试
+                </button>
+                <a href="414.html" class="direct-link">直接访问</a>
+            </div>
+        </div>
+
+        <div class="badge-result" id="resultBadge"></div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // DOM refs
+            const canvas = document.getElementById('captchaCanvas');
+            const ctx = canvas.getContext('2d');
+            const puzzleEl = document.getElementById('puzzlePiece');
+            const thumb = document.getElementById('thumb');
+            const track = document.getElementById('track');
+            const trackFill = document.getElementById('trackFill');
+            const hintMsg = document.getElementById('hintMsg');
+            const resetBtn = document.getElementById('resetBtn');
+            const resultBadge = document.getElementById('resultBadge');
+            const attemptDisplay = document.getElementById('attemptDisplay');
+
+            // 逻辑尺寸
+            const LOGIC_W = 340;
+            const LOGIC_H = 200;
+            const SIZE = 44;
+            const RAD = 6;
+            const THRESHOLD = 8;
+            const MAX_ATTEMPTS = 3;
+
+            // 状态
+            let gapX, gapY;
+            let currentLogicX = 0;
+            let isDragging = false;
+            let isVerified = false;
+            let isLocked = false;
+            let attemptsLeft = MAX_ATTEMPTS;
+            let puzzleDataURL = '';
+            let startTime = 0; // 验证开始时间戳
+
+            // 缩放因子
+            let scaleX = 1;
+            let scaleY = 1;
+            let trackAvailableWidth = 0;
+
+            const THUMB_SIZE = 44;
+
+            // 工具
+            function rand(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+
+            function updateDimensions() {
+                const canvasRect = canvas.getBoundingClientRect();
+                scaleX = canvasRect.width / LOGIC_W;
+                scaleY = canvasRect.height / LOGIC_H;
+                const trackRect = track.getBoundingClientRect();
+                const thumbWidth = thumb.offsetWidth || THUMB_SIZE;
+                const trackWidth = track.clientWidth;
+                trackAvailableWidth = Math.max(0, trackWidth - thumbWidth);
+            }
+
+            function logicToCSS(logicX, logicY) {
+                return { left: logicX * scaleX, top: logicY * scaleY };
+            }
+
+            function logicToSliderCSS(logicX) {
+                const maxLogic = LOGIC_W - SIZE;
+                const ratio = maxLogic > 0 ? logicX / maxLogic : 0;
+                return ratio * trackAvailableWidth;
+            }
+
+            function sliderCSSToLogic(cssLeft) {
+                const maxLogic = LOGIC_W - SIZE;
+                if (trackAvailableWidth <= 0) return 0;
+                const ratio = cssLeft / trackAvailableWidth;
+                return Math.max(0, Math.min(maxLogic, ratio * maxLogic));
+            }
+
+            // 绘制场景
+            function drawScene() {
+                ctx.clearRect(0, 0, LOGIC_W, LOGIC_H);
+                const g = ctx.createLinearGradient(0, 0, LOGIC_W, LOGIC_H);
+                g.addColorStop(0, '#dbeafe');
+                g.addColorStop(0.4, '#b6d4fe');
+                g.addColorStop(0.7, '#93c5fd');
+                g.addColorStop(1, '#7aa3e6');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, LOGIC_W, LOGIC_H);
+
+                for (let i = 0; i < 18; i++) {
+                    const x = rand(10, LOGIC_W - 10),
+                        y = rand(10, LOGIC_H - 10),
+                        r = rand(6, 26);
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${0.10 + Math.random() * 0.18})`;
+                    ctx.fill();
+                }
+                for (let i = 0; i < 8; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(rand(0, LOGIC_W), rand(0, LOGIC_H));
+                    ctx.lineTo(rand(0, LOGIC_W), rand(0, LOGIC_H));
+                    ctx.strokeStyle = `rgba(255,255,255,0.16)`;
+                    ctx.lineWidth = rand(1, 3);
+                    ctx.stroke();
+                }
+                for (let i = 0; i < 50; i++) {
+                    ctx.fillStyle = `rgba(255,255,255,0.20)`;
+                    ctx.beginPath();
+                    ctx.arc(rand(4, LOGIC_W - 4), rand(4, LOGIC_H - 4), rand(1, 3), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                ctx.font = 'bold 30px sans-serif';
+                ctx.fillText('◆', 24, 54);
+                ctx.fillText('◆', 278, 166);
+                ctx.font = '16px sans-serif';
+                ctx.fillText('◈', 210, 42);
+                ctx.fillText('◈', 52, 172);
+
+                const imgData = ctx.getImageData(gapX, gapY, SIZE, SIZE);
+                const tmp = document.createElement('canvas');
+                tmp.width = SIZE;
+                tmp.height = SIZE;
+                const tctx = tmp.getContext('2d');
+                tctx.putImageData(imgData, 0, 0);
+                puzzleDataURL = tmp.toDataURL('image/png');
+
+                ctx.save();
+                ctx.beginPath();
+                const x = gapX,
+                    y = gapY,
+                    w = SIZE,
+                    h = SIZE,
+                    r = RAD;
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                ctx.lineTo(x + r, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.closePath();
+                ctx.clip();
+                ctx.clearRect(gapX, gapY, SIZE, SIZE);
+                ctx.restore();
+
+                ctx.shadowColor = 'rgba(0,0,0,0.12)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(gapX, gapY, SIZE, SIZE, RAD);
+                ctx.stroke();
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.beginPath();
+                ctx.roundRect(gapX + 4, gapY + 4, SIZE - 8, SIZE - 8, RAD - 1);
+                ctx.fill();
+            }
+
+            if (!CanvasRenderingContext2D.prototype.roundRect) {
+                CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+                    const r = typeof radii === 'number' ? radii : (radii || 0);
+                    this.moveTo(x + r, y);
+                    this.arcTo(x + w, y, x + w, y + h, r);
+                    this.arcTo(x + w, y + h, x, y + h, r);
+                    this.arcTo(x, y + h, x, y, r);
+                    this.arcTo(x, y, x + w, y, r);
+                    return this;
+                };
+            }
+
+            // 更新位置
+            function updatePositions(logicX) {
+                currentLogicX = logicX;
+                const cssPos = logicToCSS(logicX, gapY);
+                puzzleEl.style.left = cssPos.left + 'px';
+                puzzleEl.style.top = cssPos.top + 'px';
+
+                const sliderLeft = logicToSliderCSS(logicX);
+                thumb.style.left = sliderLeft + 'px';
+
+                const maxLogic = LOGIC_W - SIZE;
+                const progress = maxLogic > 0 ? (logicX / maxLogic) * 100 : 0;
+                trackFill.style.width = Math.min(100, progress) + '%';
+                thumb.setAttribute('aria-valuenow', Math.round(progress));
+            }
+
+            function initPuzzleStyle() {
+                puzzleEl.style.width = (SIZE * scaleX) + 'px';
+                puzzleEl.style.height = (SIZE * scaleY) + 'px';
+                puzzleEl.style.borderRadius = (RAD * Math.min(scaleX, scaleY)) + 'px';
+                puzzleEl.style.backgroundImage = `url(${puzzleDataURL})`;
+                puzzleEl.style.backgroundSize = 'cover';
+                puzzleEl.style.display = 'block';
+            }
+
+            // 重置验证
+            function resetCaptcha() {
+                if (isLocked && attemptsLeft <= 0) {
+                    attemptsLeft = MAX_ATTEMPTS;
+                    isLocked = false;
+                }
+                isVerified = false;
+                isDragging = false;
+                thumb.classList.remove('ok', 'err', 'disabled');
+                puzzleEl.classList.remove('ok', 'err');
+                trackFill.classList.remove('ok', 'err');
+                hintMsg.className = 'msg';
+                hintMsg.textContent = '拖动滑块，将拼图对齐缺口';
+                resultBadge.className = 'badge-result';
+                resultBadge.textContent = '';
+
+                const minGap = Math.floor(LOGIC_W / 2) + 6;
+                const maxGap = LOGIC_W - SIZE - 6;
+                gapX = rand(minGap, maxGap);
+                gapY = Math.round((LOGIC_H - SIZE) / 2) + rand(-5, 5);
+                gapY = Math.max(6, Math.min(LOGIC_H - SIZE - 6, gapY));
+
+                drawScene();
+                updateDimensions();
+                initPuzzleStyle();
+                updatePositions(0);
+                updateAttemptsDisplay();
+                // 重置开始时间
+                startTime = Date.now();
+            }
+
+            function updateAttemptsDisplay() {
+                if (isLocked) {
+                    attemptDisplay.textContent = '已锁定';
+                    attemptDisplay.style.color = '#dc2626';
+                } else {
+                    attemptDisplay.textContent = '剩余 ' + attemptsLeft + ' 次';
+                    attemptDisplay.style.color = '#94a3b8';
+                }
+            }
+
+            function isMatched(logicX) {
+                return Math.abs(logicX - gapX) <= THRESHOLD;
+            }
+
+            // 成功：跳转至 414.html，带完成时间参数
+            function doSuccess() {
+                if (isVerified || isLocked) return;
+                isVerified = true;
+                thumb.classList.add('ok');
+                puzzleEl.classList.add('ok');
+                trackFill.classList.add('ok');
+                hintMsg.className = 'msg ok';
+                hintMsg.textContent = '验证通过';
+                resultBadge.className = 'badge-result show ok';
+                resultBadge.textContent = '验证成功，即将跳转...';
+                thumb.setAttribute('aria-valuenow', '100');
+                thumb.classList.add('disabled');
+                isDragging = false;
+
+                // 计算完成耗时（毫秒）
+                const elapsed = Date.now() - startTime;
+                // 跳转到 414.html，附带时间参数
+                window.location.href = '414.html?time=' + elapsed;
+            }
+
+            function doFail() {
+                if (isVerified || isLocked) return;
+                attemptsLeft--;
+                updateAttemptsDisplay();
+
+                if (attemptsLeft <= 0) {
+                    isLocked = true;
+                    thumb.classList.add('disabled');
+                    hintMsg.className = 'msg locked';
+                    hintMsg.textContent = '验证已锁定，请刷新重试';
+                    resultBadge.className = 'badge-result show locked';
+                    resultBadge.textContent = '失败次数过多，已锁定';
+                    thumb.classList.add('err');
+                    puzzleEl.classList.add('err');
+                    trackFill.classList.add('err');
+                    return;
+                }
+
+                thumb.classList.add('err');
+                puzzleEl.classList.add('err');
+                trackFill.classList.add('err');
+                hintMsg.className = 'msg err';
+                hintMsg.textContent = '未对齐，剩余 ' + attemptsLeft + ' 次';
+                resultBadge.className = 'badge-result show err';
+                resultBadge.textContent = '拼图未对齐，请继续调整';
+            }
+
+            // ----- 拖动事件 -----
+            function onStart(e) {
+                if (isVerified || isLocked || thumb.classList.contains('disabled')) return;
+                thumb.classList.remove('err');
+                puzzleEl.classList.remove('err');
+                trackFill.classList.remove('err');
+                hintMsg.className = 'msg';
+                hintMsg.textContent = '拖动滑块，将拼图对齐缺口';
+                resultBadge.className = 'badge-result';
+                resultBadge.textContent = '';
+
+                isDragging = true;
+                thumb.classList.add('dragging');
+                puzzleEl.classList.add('dragging');
+                e.preventDefault();
+            }
+
+            function onMove(e) {
+                if (!isDragging || isVerified || isLocked) return;
+                e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const trackRect = track.getBoundingClientRect();
+                const thumbWidth = thumb.offsetWidth || THUMB_SIZE;
+                let offsetX = clientX - trackRect.left - thumbWidth / 2;
+                offsetX = Math.max(0, Math.min(offsetX, trackAvailableWidth));
+
+                const maxLogic = LOGIC_W - SIZE;
+                const logicX = maxLogic * (offsetX / trackAvailableWidth);
+                const clampedLogic = Math.max(0, Math.min(maxLogic, logicX));
+                updatePositions(clampedLogic);
+            }
+
+            function onEnd(e) {
+                if (isDragging) {
+                    isDragging = false;
+                    thumb.classList.remove('dragging');
+                    puzzleEl.classList.remove('dragging');
+
+                    if (!isVerified && !isLocked) {
+                        const logicX = currentLogicX;
+                        if (isMatched(logicX)) {
+                            doSuccess();
+                        } else {
+                            doFail();
+                        }
+                    }
+                }
+            }
+
+            // ----- 绑定事件 -----
+            thumb.addEventListener('mousedown', onStart);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onEnd);
+            thumb.addEventListener('touchstart', onStart, { passive: false });
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onEnd, { passive: false });
+
+            resetBtn.addEventListener('click', resetCaptcha);
+            canvas.addEventListener('dragstart', e => e.preventDefault());
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    if (!isVerified && !isLocked) {
+                        updateDimensions();
+                        puzzleEl.style.width = (SIZE * scaleX) + 'px';
+                        puzzleEl.style.height = (SIZE * scaleY) + 'px';
+                        puzzleEl.style.borderRadius = (RAD * Math.min(scaleX, scaleY)) + 'px';
+                        updatePositions(currentLogicX);
+                    }
+                }, 200);
+            });
+
+            // 初始化
+            function init() {
+                const minGap = Math.floor(LOGIC_W / 2) + 6;
+                const maxGap = LOGIC_W - SIZE - 6;
+                gapX = rand(minGap, maxGap);
+                gapY = Math.round((LOGIC_H - SIZE) / 2) + rand(-5, 5);
+                gapY = Math.max(6, Math.min(LOGIC_H - SIZE - 6, gapY));
+
+                drawScene();
+                updateDimensions();
+                initPuzzleStyle();
+                updatePositions(0);
+                updateAttemptsDisplay();
+                startTime = Date.now(); // 记录开始时间
+            }
+
+            init();
+
+            // 暴露重置方法
+            window.resetCaptcha = resetCaptcha;
+            window.captchaState = () => ({ verified: isVerified, locked: isLocked, attempts: attemptsLeft });
+
+        })();
+    </script>
+</body>
+</html>
