@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>成绩概览</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background-color:#F2F4F8;color:#1F2937;display:flex;justify-content:center}
+        .app-container{width:100%;max-width:414px;background-color:#F6F8FA;min-height:100vh;position:relative;overflow-x:hidden}
+        .status-bar{background-color:#1E1E1E;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:0 16px;height:34px;font-size:14px;font-weight:600}
+        .status-left{display:flex;align-items:center;gap:10px}
+        .status-icons{display:flex;align-items:center;gap:4px}
+        #batteryPercent{font-size:13px;font-weight:600;color:#fff;letter-spacing:.3px;margin-right:2px}
+        #signalIcon{cursor:pointer;transition:opacity .2s}
+        #signalIcon:hover{opacity:.7}
+        #signalIcon:active{opacity:.4}
+        .nav-bar{background-color:#fff;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f0f0f0}
+        .nav-title{font-size:17px;font-weight:500;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;text-align:center;padding:0 10px}
+        .nav-icon{width:24px;height:24px;fill:#1F2937;cursor:default}
+        .orange-banner{background-color:#F97316;padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #ea580c}
+        .orange-banner .banner-icon{flex-shrink:0;width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+        .orange-banner .banner-text{font-size:13px;color:#fff;line-height:1.4;font-weight:500;letter-spacing:.3px}
+        .orange-banner .banner-text strong{font-weight:700;margin-right:4px}
+        .tabs{background-color:#fff;display:flex;padding:0 16px;overflow-x:auto;white-space:nowrap;border-bottom:1px solid #f0f0f0}
+        .tab-item{padding:14px 12px;font-size:15px;color:#6B7280;position:relative;cursor:default}
+        .tab-item.active{color:#1F2937;font-weight:600}
+        .tab-item.active::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:3px;background-color:#2DD4BF;border-radius:2px}
+        .card{background-color:#fff;margin:12px 16px;border-radius:12px;padding:20px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.02)}
+        .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .card-title{font-size:18px;font-weight:600;color:#1F2937}
+        .card-sub{color:#9CA3AF;font-size:13px;display:flex;align-items:center;gap:4px}
+        .card-sub svg{fill:#9CA3AF}
+        .gauge-wrapper{position:relative;display:flex;justify-content:center;align-items:flex-end;height:140px;margin-top:10px}
+        .score-text-wrap{position:absolute;bottom:20px;text-align:center;width:100%;z-index:10}
+        .score-number{font-size:44px;font-weight:700;color:#1F2937;letter-spacing:-1px;line-height:1}
+        .score-label{font-size:12px;color:#9CA3AF;margin-top:4px}
+        .switcher-wrap{display:flex;justify-content:center;margin:16px 0 12px 0}
+        .switcher-group{background-color:#F3F4F6;border-radius:20px;display:flex;padding:3px;gap:2px}
+        .switcher-item{padding:5px 16px;font-size:14px;border-radius:18px;color:#9CA3AF;cursor:default}
+        .switcher-item.active{background-color:#fff;color:#1F2937;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+        .scale-container{position:relative;padding:0 8px;margin:20px 0 10px 0}
+        .scale-bar{display:flex;height:8px;border-radius:4px;overflow:hidden}
+        .scale-seg{flex:1}
+        .scale-seg.e{background-color:#F87171}
+        .scale-seg.d{background-color:#FB923C}
+        .scale-seg.c{background-color:#FBBF24}
+        .scale-seg.b{background-color:#34D399}
+        .scale-seg.a{background-color:#60A5FA}
+        .scale-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#9CA3AF}
+        .scale-indicator{position:absolute;top:-10px;left:60%;transform:translateX(-50%);background-color:#60A5FA;color:#fff;font-size:12px;font-weight:600;padding:2px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(96,165,250,0.4);transition:left .4s ease,background-color .3s ease;z-index:5;min-width:24px;text-align:center}
+        .subjects-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+        .subject-item{background-color:#F9FAFB;border-radius:10px;padding:14px 4px;text-align:center}
+        .subject-score{font-size:22px;font-weight:600;color:#1F2937;transition:color .3s}
+        .subject-name{font-size:13px;color:#6B7280;margin-top:4px}
+        .card-footer{display:flex;justify-content:center;align-items:center;margin-top:20px;color:#6B7280;font-size:14px;gap:4px;cursor:default}
+        .card-footer svg{stroke:#6B7280}
+        .balance-card{padding-bottom:0;margin-bottom:30px;overflow:hidden}
+        .chart-placeholder{display:flex;justify-content:center;align-items:center;height:100px;margin-top:-20px;background:#fff;border-top:1px solid #f0f0f0;position:relative}
+        .icon-24{width:24px;height:24px}
+        .icon-16{width:16px;height:16px}
+        .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:999}
+        .modal-overlay.active{display:flex}
+        .modal-box{background-color:#fff;border-radius:16px;width:92%;max-width:380px;max-height:90vh;overflow-y:auto;padding:24px 20px 20px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;animation:modalIn .35s cubic-bezier(.34,1.56,.64,1)}
+        .modal-box::-webkit-scrollbar{width:4px}
+        .modal-box::-webkit-scrollbar-thumb{background-color:#d1d5db;border-radius:4px}
+        @keyframes modalIn{0%{transform:translateY(60px) scale(.92);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+        .modal-title{font-size:20px;font-weight:700;color:#1F2937;text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #F3F4F6}
+        .modal-field{margin-bottom:14px}
+        .modal-field label{display:block;font-size:14px;font-weight:500;color:#374151;margin-bottom:4px}
+        .modal-field .field-row{display:flex;align-items:center;gap:8px}
+        .modal-field .field-row input{flex:1;padding:10px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:15px;color:#1F2937;background-color:#F9FAFB;transition:border-color .2s,box-shadow .2s;outline:none;width:100%}
+        .modal-field .field-row input:focus{border-color:#2DD4BF;box-shadow:0 0 0 3px rgba(45,212,191,0.15);background-color:#fff}
+        .modal-field .field-row input[type="number"]{-moz-appearance:textfield}
+        .modal-field .field-row input[type="number"]::-webkit-outer-spin-button,.modal-field .field-row input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+        .modal-field .field-unit{font-size:14px;color:#6B7280;min-width:20px}
+        .modal-field .field-hint{font-size:12px;color:#9CA3AF;margin-top:2px}
+        .modal-field-group-title{font-size:15px;font-weight:600;color:#1F2937;margin:18px 0 12px 0;padding-top:12px;border-top:1px solid #F3F4F6}
+        .modal-actions{display:flex;gap:12px;margin-top:24px;padding-top:16px;border-top:1px solid #F3F4F6}
+        .modal-actions button{flex:1;padding:12px 0;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;transition:background-color .2s,transform .1s}
+        .modal-actions button:active{transform:scale(.97)}
+        .modal-actions .btn-cancel{background-color:#F3F4F6;color:#6B7280}
+        .modal-actions .btn-cancel:hover{background-color:#E5E7EB}
+        .modal-actions .btn-save{background-color:#2DD4BF;color:#fff}
+        .modal-actions .btn-save:hover{background-color:#14B8A6}
+        .score-grid-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+        .score-grid-inputs .modal-field{margin-bottom:0}
+        .score-grid-inputs .modal-field label{font-size:13px;margin-bottom:2px}
+        .score-grid-inputs .modal-field .field-row input{padding:8px 10px;font-size:14px}
+        @media (max-width:380px){.score-grid-inputs{grid-template-columns:1fr;gap:8px}.modal-box{padding:18px 14px 16px}.modal-title{font-size:18px}}
+        .modal-close-btn{position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#9CA3AF;cursor:pointer;padding:4px 8px;border-radius:8px;transition:background-color .2s}
+        .modal-close-btn:hover{background-color:#F3F4F6}
+        .toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(80px);background-color:#1F2937;color:#fff;padding:10px 24px;border-radius:24px;font-size:14px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .4s ease,transform .4s ease;z-index:1000;pointer-events:none;white-space:nowrap}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    </style>
+</head>
+<body>
+<div class="app-container">
+<div class="status-bar">
+<div class="status-left"><span id="timeDisplay">20:18</span></div>
+<div class="status-icons">
+<svg id="signalIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+<span id="batteryPercent">75%</span>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><rect x="2" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2" fill="none"/><rect x="22" y="10" width="2" height="4" rx="1" fill="white"/></svg>
+</div>
+</div>
+<div class="nav-bar">
+<svg class="nav-icon" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+<div class="nav-title">2025-2026学年第二学期七...</div>
+<svg class="nav-icon" viewBox="0 0 24 24"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+</div>
+<div class="orange-banner">
+<svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+<span class="banner-text"><strong>提示：</strong>您当前正在使用旧版智学网客户端，您的设备可能不支持更新到最新版，智学网不对此进行保障</span>
+</div>
+<div class="tabs">
+<div class="tab-item active">总分</div>
+<div class="tab-item">语文</div>
+<div class="tab-item">数学</div>
+<div class="tab-item">英语</div>
+<div class="tab-item">生物</div>
+<div class="tab-item">政治</div>
+</div>
+<div class="card">
+<div class="card-header">
+<span class="card-title">成绩概览</span>
+<span class="card-sub">指标说明<svg class="icon-16" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></span>
+</div>
+<div class="gauge-wrapper">
+<svg width="100%" height="140" viewBox="0 0 340 140" style="position:absolute;top:-20px"><defs><linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#C1F0E0"/><stop offset="100%" stop-color="#D7F5EB"/></linearGradient><linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2DD4BF"/><stop offset="100%" stop-color="#14B8A6"/></linearGradient></defs><path d="M 40 130 A 130 130 0 0 0 300 130" stroke="url(#gaugeGrad)" stroke-width="26" fill="none" stroke-linecap="round"/><path id="gaugeProgress" d="M 40 130 A 130 130 0 0 0 300 130" stroke="url(#progressGrad)" stroke-width="26" fill="none" stroke-linecap="round" stroke-dasharray="270.4 999"/><circle cx="100" cy="32" r="8" fill="#14B8A6" stroke="#fff" stroke-width="4"/><text x="30" y="160" font-size="14" fill="#9CA3AF" text-anchor="middle">0</text><text x="310" y="160" font-size="14" fill="#9CA3AF" text-anchor="middle">710</text></svg>
+<div class="score-text-wrap"><div class="score-number" id="totalScore">470</div><div class="score-label">总分分数</div></div>
+</div>
+<div class="switcher-wrap"><div class="switcher-group"><div class="switcher-item active">班级</div><div class="switcher-item">年级</div></div></div>
+<div class="scale-container" id="scaleContainer"><div class="scale-indicator" id="scaleIndicator">C</div><div class="scale-bar"><div class="scale-seg e"></div><div class="scale-seg d"></div><div class="scale-seg c"></div><div class="scale-seg b"></div><div class="scale-seg a"></div></div><div class="scale-labels"><span>E</span><span>D</span><span>C</span><span>B</span><span>A</span></div></div>
+<div class="subjects-grid" id="subjectsGrid"><div class="subject-item"><div class="subject-score" id="score_yw">81</div><div class="subject-name">语文</div></div><div class="subject-item"><div class="subject-score" id="score_sx">64</div><div class="subject-name">数学</div></div><div class="subject-item"><div class="subject-score" id="score_yy">96</div><div class="subject-name">英语</div></div><div class="subject-item"><div class="subject-score" id="score_sw">80</div><div class="subject-name">生物</div></div><div class="subject-item"><div class="subject-score" id="score_zz">54</div><div class="subject-name">政治</div></div><div class="subject-item"><div class="subject-score" id="score_ls">38</div><div class="subject-name">历史</div></div><div class="subject-item"><div class="subject-score" id="score_dl">57</div><div class="subject-name">地理</div></div></div>
+<div class="card-footer"><span>学科成绩详情</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+</div>
+<div class="card balance-card">
+<div class="card-header"><span class="card-title">学科均衡度</span><span class="card-sub">指标说明<svg class="icon-16" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg></span></div>
+<div class="chart-placeholder"><svg width="100%" height="100" viewBox="0 0 200 100"><line x1="100" y1="50" x2="50" y2="50" stroke="#E5E7EB" stroke-width="1" stroke-dasharray="3,3"/><line x1="100" y1="50" x2="150" y2="50" stroke="#E5E7EB" stroke-width="1" stroke-dasharray="3,3"/><line x1="100" y1="50" x2="100" y2="0" stroke="#E5E7EB" stroke-width="1" stroke-dasharray="3,3"/><polygon points="100,50 60,30 120,20 100,50" fill="#A7F3D0" fill-opacity="0.6" stroke="#10B981" stroke-width="2"/><text x="60" y="75" font-size="14" fill="#6B7280" text-anchor="middle">语文</text></svg></div>
+</div>
+<div class="toast" id="toast">设置已保存</div>
+<div class="modal-overlay" id="modalOverlay"><div class="modal-box"><button class="modal-close-btn" id="modalCloseBtn">x</button><div class="modal-title">修改设置</div><div class="modal-field"><label>电量 (%)</label><div class="field-row"><input type="number" id="inputBattery" value="75" min="0" max="100" placeholder="0-100"><span class="field-unit">%</span></div></div><div class="modal-field"><label>时间</label><div class="field-row"><input type="text" id="inputTime" value="20:18" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}"><span class="field-unit">⏱</span></div><div class="field-hint">格式：HH:MM (如 14:30)</div></div><div class="modal-field-group-title">各科成绩 (任意数字)</div><div class="score-grid-inputs"><div class="modal-field"><label>语文</label><div class="field-row"><input type="number" id="inputYw" value="81" step="any"></div></div><div class="modal-field"><label>数学</label><div class="field-row"><input type="number" id="inputSx" value="64" step="any"></div></div><div class="modal-field"><label>英语</label><div class="field-row"><input type="number" id="inputYy" value="96" step="any"></div></div><div class="modal-field"><label>生物</label><div class="field-row"><input type="number" id="inputSw" value="80" step="any"></div></div><div class="modal-field"><label>政治</label><div class="field-row"><input type="number" id="inputZz" value="54" step="any"></div></div><div class="modal-field"><label>历史</label><div class="field-row"><input type="number" id="inputLs" value="38" step="any"></div></div><div class="modal-field"><label>地理</label><div class="field-row"><input type="number" id="inputDl" value="57" step="any"></div></div></div><div class="modal-actions"><button class="btn-cancel" id="modalCancelBtn">取消</button><button class="btn-save" id="modalSaveBtn">保存</button></div></div></div>
+</div>
+<script>
+/* 下面这些乱糟糟的代码，我自己都看不太懂，但反正能跑 */
+var _sig = document.getElementById('signalIcon');
+var _ov = document.getElementById('modalOverlay');
+var _cls = document.getElementById('modalCloseBtn');
+var _can = document.getElementById('modalCancelBtn');
+var _sav = document.getElementById('modalSaveBtn');
+
+var _bat = document.getElementById('inputBattery');
+var _tim = document.getElementById('inputTime');
+var _yw = document.getElementById('inputYw');
+var _sx = document.getElementById('inputSx');
+var _yy = document.getElementById('inputYy');
+var _sw = document.getElementById('inputSw');
+var _zz = document.getElementById('inputZz');
+var _ls = document.getElementById('inputLs');
+var _dl = document.getElementById('inputDl');
+
+var _batShow = document.getElementById('batteryPercent');
+var _timShow = document.getElementById('timeDisplay');
+var _tot = document.getElementById('totalScore');
+var _ind = document.getElementById('scaleIndicator');
+var _gauge = document.getElementById('gaugeProgress');
+
+var _scores = {
+    yw: document.getElementById('score_yw'),
+    sx: document.getElementById('score_sx'),
+    yy: document.getElementById('score_yy'),
+    sw: document.getElementById('score_sw'),
+    zz: document.getElementById('score_zz'),
+    ls: document.getElementById('score_ls'),
+    dl: document.getElementById('score_dl')
+};
+var _keys = ['yw','sx','yy','sw','zz','ls','dl'];
+var _inputs = {yw:_yw,sx:_sx,yy:_yy,sw:_sw,zz:_zz,ls:_ls,dl:_dl};
+
+var _toast = document.getElementById('toast');
+var _timer = null;
+
+function _clamp(v,min,max){ if(v<min) return min; if(v>max) return max; return v; }
+
+function _showToast(msg){ _toast.textContent = msg || '设置已保存'; _toast.classList.add('show'); clearTimeout(_timer); _timer = setTimeout(function(){ _toast.classList.remove('show'); },1800); }
+
+function _update(){
+    var a = parseFloat(_yw.value)||0;
+    var b = parseFloat(_sx.value)||0;
+    var c = parseFloat(_yy.value)||0;
+    var d = parseFloat(_sw.value)||0;
+    var e = parseFloat(_zz.value)||0;
+    var f = parseFloat(_ls.value)||0;
+    var g = parseFloat(_dl.value)||0;
+    var total = a+b+c+d+e+f+g;
+    var totalR = Math.round(total*100)/100;
+    // 更新各科
+    var vals = {yw:a,sx:b,yy:c,sw:d,zz:e,ls:f,dl:g};
+    for(var i=0;i<_keys.length;i++){
+        var k = _keys[i];
+        if(_scores[k]){
+            var vv = vals[k];
+            var disp = Number.isInteger(vv) ? vv : vv.toFixed(2);
+            _scores[k].textContent = disp;
+        }
+    }
+    // 总分
+    var totDisp = Number.isInteger(totalR) ? totalR : totalR.toFixed(2);
+    _tot.textContent = totDisp;
+    // 等级
+    var maxS = 710;
+    var pct = _clamp((totalR/maxS)*100,0,100);
+    if(totalR<0) pct=0;
+    _ind.style.left = pct+'%';
+    var grade = 'E';
+    var col = '#F87171';
+    if(pct>=80){ grade='A'; col='#60A5FA'; }
+    else if(pct>=60){ grade='B'; col='#34D399'; }
+    else if(pct>=40){ grade='C'; col='#FBBF24'; }
+    else if(pct>=20){ grade='D'; col='#FB923C'; }
+    else { grade='E'; col='#F87171'; }
+    _ind.textContent = grade;
+    _ind.style.backgroundColor = col;
+    _ind.style.boxShadow = '0 1px 3px '+col+'66';
+    // 仪表盘
+    var arc = 270.4;
+    var dash = (pct/100)*arc;
+    _gauge.setAttribute('stroke-dasharray', dash+' 999');
+    // 电量
+    var bv = parseInt(_bat.value);
+    if(!isNaN(bv) && bv>=0 && bv<=100){ _batShow.textContent = bv+'%'; }
+    // 时间
+    var tv = _tim.value.trim();
+    if(tv && /^\d{2}:\d{2}$/.test(tv)){ _timShow.textContent = tv; }
+}
+
+function _openModal(){
+    // 从界面读当前值填充
+    var batTxt = _batShow.textContent.replace('%','');
+    _bat.value = parseInt(batTxt)||75;
+    _tim.value = _timShow.textContent;
+    for(var i=0;i<_keys.length;i++){
+        var k = _keys[i];
+        if(_scores[k]){
+            var v = parseFloat(_scores[k].textContent);
+            if(!isNaN(v)){ _inputs[k].value = v; }
+        }
+    }
+    _ov.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function(){ _bat.focus(); _bat.select(); },200);
+}
+
+function _closeModal(){
+    _ov.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function _save(){
+    var tv = _tim.value.trim();
+    if(tv && !/^\d{2}:\d{2}$/.test(tv)){
+        alert('时间格式错误，请使用 HH:MM 格式 (如 14:30)');
+        _tim.focus();
+        return;
+    }
+    var bv = parseInt(_bat.value);
+    if(!isNaN(bv) && (bv<0 || bv>100)){
+        alert('电量请输入 0-100 之间的数字');
+        _bat.focus();
+        return;
+    }
+    _update();
+    _closeModal();
+    _showToast('设置已保存');
+}
+
+// 绑定事件
+_sig.addEventListener('click', function(e){ e.stopPropagation(); _openModal(); });
+_cls.addEventListener('click', _closeModal);
+_can.addEventListener('click', _closeModal);
+_ov.addEventListener('click', function(e){ if(e.target===_ov) _closeModal(); });
+_sav.addEventListener('click', _save);
+
+document.addEventListener('keydown', function(e){
+    if(!_ov.classList.contains('active')) return;
+    if(e.key==='Escape'){ _closeModal(); }
+    else if(e.key==='Enter'){
+        var act = document.activeElement;
+        if(act && act.tagName==='INPUT'){
+            e.preventDefault();
+            _save();
+        }
+    }
+});
+
+var _allInputs = [_bat,_tim,_yw,_sx,_yy,_sw,_zz,_ls,_dl];
+for(var idx=0; idx<_allInputs.length; idx++){
+    (function(j){
+        _allInputs[j].addEventListener('keydown', function(e){
+            if(e.key==='Enter'){
+                e.preventDefault();
+                if(j===_allInputs.length-1){
+                    _save();
+                }else{
+                    var nxt = _allInputs[j+1];
+                    if(nxt){ nxt.focus(); nxt.select(); }
+                }
+            }
+        });
+    })(idx);
+}
+
+// 初始化
+function _init(){
+    var bt = _batShow.textContent.replace('%','');
+    _bat.value = parseInt(bt)||75;
+    _tim.value = _timShow.textContent;
+    for(var i=0;i<_keys.length;i++){
+        var k = _keys[i];
+        if(_scores[k]){
+            var v = parseFloat(_scores[k].textContent);
+            if(!isNaN(v)){ _inputs[k].value = v; }
+        }
+    }
+    _update();
+}
+_init();
+
+// 以下是一些新手留下的调试信息，不用管
+console.log('页面加载完成，如果有什么问题，那一定是你操作不对');
+console.log('电量，时间，成绩都可以改，点信号图标就行');
+console.log('别问我为什么这么写，能跑就是好代码');
+</script>
+</body>
+</html>
